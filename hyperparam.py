@@ -51,7 +51,7 @@ def hyperparamLogisticReg(X_train, y_train):
     'penalty':['l1','l2','elasticnet','none'],
     'C' : np.logspace(-4,4,20),
     'solver': ['lbfgs','newton-cg','liblinear','sag','saga'],
-    'max_iter'  : [10, 100,1000,2500,5000]
+    'max_iter'  : [10,100,1000,10000]
 	}
 
 	models = {
@@ -158,4 +158,4 @@ def hyperparamxgb(X_train, y_train):
 # hyperparamRF(X_train=X_train, y_train=y_train)
 # hyperparamLogisticReg(X_train, y_train)
 # hyperparamknn(X_train, y_train)
-hyperparamxgb(X_train, y_train)
+# hyperparamxgb(X_train, y_train)
