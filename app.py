@@ -9,14 +9,24 @@ col1, col2, col3 = st.columns([1, 1, 1])
 
 with col1:
 	gender = st.segmented_control("Gender", ["Male", "Female"], selection_mode="single", key="sex")
-	gender = 1 if gender == "Male" else 0
+	if gender == "Male":
+		gender = 1
+	elif gender == "Female":
+		gender = 0
+
 with col2:
 	ever_married = st.segmented_control("Ever Married?", ["Yes", "No"], selection_mode="single", key="marriage")
-	ever_married = 1 if ever_married == "Yes" else 0
+	if ever_married == "Yes":
+		ever_married = 1
+	elif ever_married == "No":
+		ever_married = 0
+
 with col3:
 	hypertension = st.segmented_control("HyperTension", ["None", "Yes"], selection_mode="single", key="hypert")
-	hypertension = 1 if hypertension == "Yes" else 0
-
+	if hypertension == "Yes":
+		hypertension = 1
+	elif hypertension == "None":
+		hypertension = 0
 
 
 col4, col5, col6, = st.columns([1, 1, 1])
