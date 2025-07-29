@@ -11,11 +11,9 @@ A machine learning project designed to predict the likelihood of a patient havin
 
 ## 🚀 Live Demo
 
-> **Note:** A live version of the app can be deployed on services like Streamlit Community Cloud or Heroku.
-
 **[Link to your deployed Streamlit App]** (<- Replace with your actual deployment URL)
 
-![Streamlit App Screenshot](https://placehold.co/800x500/2B303A/FFFFFF?text=App+Screenshot+Here)
+![Streamlit App Screenshot](images/Screenshot.png)
 *A preview of the interactive stroke prediction web application.*
 
 ---
