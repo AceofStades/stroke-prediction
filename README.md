@@ -155,7 +155,3 @@ Contributions are welcome! If you have ideas for improvements or find any issues
 ## 📜 License
 
 This project is licensed under the MIT License. See the `LICENSE` file for more details.
-
----
-
-*This README was generated on July 29, 2025.*
