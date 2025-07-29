@@ -10,7 +10,6 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from xgboost import XGBClassifier
 
 df = pd.read_csv("cleaned_data.csv")
-df = df.drop(columns=['Unnamed: 0'])
 
 X = df.drop('stroke', axis = 1)
 y = df['stroke']
@@ -130,7 +129,7 @@ def hyperparamxgb(X_train, y_train):
 
 	param_grid_xgb = {
 	    'n_estimators': [100, 200, 300],
-	    'learning_rate': [0.01, 0.05, 0.1],
+	    'learning_rate': [0.01, 0.05, 0.1, 1],
 	    'max_depth': [3, 5, 7],
 	    'subsample': [0.7, 0.8, 1.0],
 	    'colsample_bytree': [0.7, 0.8, 1.0],
@@ -158,4 +157,4 @@ def hyperparamxgb(X_train, y_train):
 # hyperparamRF(X_train=X_train, y_train=y_train)
 # hyperparamLogisticReg(X_train, y_train)
 # hyperparamknn(X_train, y_train)
-# hyperparamxgb(X_train, y_train)
+hyperparamxgb(X_train, y_train)
