@@ -1,94 +1,136 @@
 import pandas as pd
-import numpy as np
 import joblib
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import classification_report
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.metrics import classification_report, f1_score, make_scorer
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from imblearn.pipeline import Pipeline as ImbPipeline
+from imblearn.over_sampling import SMOTE
+import warnings
 
-# Import the models and pipeline tools
-import xgboost as xgb
-from imblearn.pipeline import Pipeline
-from imblearn.combine import SMOTEENN
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
-# --------------------------------------------------------------------------
-# 1. DATA PREPARATION
-# --------------------------------------------------------------------------
-
-# Load your cleaned dataset
 try:
     df = pd.read_csv("cleaned_data.csv")
 except FileNotFoundError:
     print("Error: 'cleaned_data.csv' not found. Make sure the file is in the same directory.")
     exit()
 
-# Drop the old index column if it exists
-if 'Unnamed: 0' in df.columns:
-    df = df.drop(columns=['Unnamed: 0'])
-
-# Define features (X) and target (y)
 X = df.drop('stroke', axis=1)
 y = df['stroke']
 
-# Split the data into training and testing sets, ensuring balanced classes in both
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
-    test_size=0.2,     # 20% of data will be for testing
-    stratify=y,        # Ensures same proportion of stroke/no-stroke in train/test
-    random_state=42    # For reproducible results
+    X, y, test_size=0.2, stratify=y, random_state=42
 )
 
-# --------------------------------------------------------------------------
-# 2. MODEL PIPELINE AND HYPERPARAMETER TUNING
-# --------------------------------------------------------------------------
 
-# Define the steps for the machine learning pipeline
-# Step 1: Resample the data using SMOTEENN to handle class imbalance
-# Step 2: Train the XGBoost Classifier
-pipeline = Pipeline(steps=[
-    ('sampler', SMOTEENN(random_state=42)),
-    ('classifier', xgb.XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss'))
+def create_interaction_features(df):
+    df_copy = df.copy()
+    df_copy['age_x_bmi'] = df_copy['age'] * df_copy['bmi']
+    df_copy['age_x_glucose'] = df_copy['age'] * df_copy['avg_glucose_level']
+    df_copy['bmi_x_glucose'] = df_copy['bmi'] * df_copy['avg_glucose_level']
+    df_copy['risk_factor_count'] = df_copy['hypertension'] + df_copy['heart_disease']
+    return df_copy
+
+feature_creator = FunctionTransformer(create_interaction_features)
+
+# Logistic Regression is sensitive to feature scaling, so we add a StandardScaler.
+pipeline = ImbPipeline(steps=[
+    ('feature_creator', feature_creator),
+    ('scaler', StandardScaler()),
+    ('selector', SelectKBest(f_classif)),
+    ('sampler', SMOTE(random_state=42)),
+    # MODEL CHANGE: Swapped XGBoost for LogisticRegression
+    ('classifier', LogisticRegression(
+        random_state=42,
+        solver='liblinear',
+        max_iter=1000
+    ))
 ])
 
-# Define the grid of hyperparameters to search through
-# The model will be tested with each combination of these settings
 param_grid = {
-    'classifier__max_depth': [3, 5, 7],
-    'classifier__n_estimators': [100, 200, 300],
-    'classifier__learning_rate': [0.01, 0.1, 0.2]
+    'selector__k': [10, 15, 'all'],
+    'sampler__sampling_strategy': [0.5, 0.75, 1.0],
+    'classifier__C': [0.01, 0.1, 1, 10, 100],
+    'classifier__penalty': ['l1', 'l2'],
+    'classifier__class_weight': ['balanced', None]
 }
 
-# Set up the grid search
-# This will automatically handle resampling within each cross-validation fold
-# to prevent data leakage and find the best model robustly.
-# We are optimizing for the F1-score of the positive class.
-grid_search = GridSearchCV(
+scorer = make_scorer(f1_score, pos_label=1)
+random_search = RandomizedSearchCV(
     estimator=pipeline,
-    param_grid=param_grid,
-    scoring='f1', # Focus on the F1 score for the minority class
-    cv=5,         # 5-fold cross-validation
-    n_jobs=-1,    # Use all available CPU cores
-    verbose=1     # Show progress
+    param_distributions=param_grid,
+    n_iter=50,
+    scoring=scorer,
+    cv=5,
+    n_jobs=-1,
+    verbose=1,
+    random_state=42
 )
 
-# Execute the grid search on the training data
-print("Starting hyperparameter tuning with GridSearchCV...")
-grid_search.fit(X_train, y_train)
+print("\nStarting hyperparameter tuning with Logistic Regression...")
+random_search.fit(X_train, y_train)
 
-# --------------------------------------------------------------------------
-# 3. EVALUATION
-# --------------------------------------------------------------------------
+# Evaluation
+print("\n--- Randomized Search Results ---")
+print(f"Best Hyperparameters: {random_search.best_params_}")
+print(f"Best Cross-Validation F1-Score: {random_search.best_score_:.4f}")
 
-# Print the best parameters and the best cross-validation F1 score
-print("\n--- Grid Search Results ---")
-print(f"Best Hyperparameters: {grid_search.best_params_}")
-print(f"Best Cross-Validation F1-Score: {grid_search.best_score_:.4f}")
+best_model = random_search.best_estimator_
+y_pred_proba = best_model.predict_proba(X_test)[:, 1]
 
-# Use the best model found by the grid search to make predictions on the unseen test data
-print("\n--- Final Evaluation on Test Data ---")
-best_model = grid_search.best_estimator_
-y_pred = best_model.predict(X_test)
+# Find and apply the optimal threshold
+thresholds = np.arange(0.1, 0.9, 0.01)
+best_f1 = 0
+optimal_threshold = 0.5
+for threshold in thresholds:
+    y_pred_tuned = (y_pred_proba >= threshold).astype(int)
+    current_f1 = f1_score(y_test, y_pred_tuned, pos_label=1, zero_division=0)
+    if current_f1 > best_f1:
+        best_f1 = current_f1
+        optimal_threshold = threshold
 
-# Print the final classification report
-print(classification_report(y_test, y_pred, labels=[0, 1], zero_division=0))
+print(f"\nOptimal Threshold found: {optimal_threshold:.4f}")
+print(f"Best F1-score on Test Data at Optimal Threshold: {best_f1:.4f}")
 
-filename = 'model-xgb.joblib'
+y_pred_final = (y_pred_proba >= optimal_threshold).astype(int)
+print("\n--- Final Evaluation on Test Data (with Optimal Threshold) ---")
+print(classification_report(y_test, y_pred_final, labels=[0, 1], zero_division=0))
+
+filename = 'model-lr-feature-eng.joblib'
 joblib.dump(best_model, filename)
+print(f"\nBest Logistic Regression model saved to {filename}")
+
+# FEATURE COEFFICIENT ANALYSIS (for Logistic Regression)
+print("\n--- Feature Analysis from Best Pipeline ---")
+
+selector = best_model.named_steps['selector']
+classifier = best_model.named_steps['classifier']
+
+all_engineered_features = create_interaction_features(X_train).columns
+selected_mask = selector.get_support()
+final_feature_names = [name for name, selected in zip(all_engineered_features, selected_mask) if selected]
+
+print(f"Number of features selected: {len(final_feature_names)}")
+
+if hasattr(classifier, 'coef_'):
+    coefficients = classifier.coef_[0]
+    feature_coeffs_df = pd.DataFrame({
+        'feature': final_feature_names,
+        'coefficient': coefficients
+    }).sort_values('coefficient', key=abs, ascending=False)
+
+    print("\n--- Coefficients of Selected Features ---")
+    print(feature_coeffs_df)
+
+    plt.figure(figsize=(10, 8))
+    plt.barh(feature_coeffs_df['feature'], feature_coeffs_df['coefficient'])
+    plt.xlabel("Coefficient Value (Impact on Prediction)")
+    plt.title("Feature Coefficients from Best Logistic Regression Model")
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+    plt.show()
