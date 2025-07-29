@@ -140,10 +140,10 @@ def hyperparamxgb(X_train, y_train):
 	grid = GridSearchCV(
 	    estimator=xgb_model,
 	    param_grid=param_grid_xgb,
-	    cv=3,                       # Number of cross-validation folds
-	    scoring='f1',               # Use F1-score due to class imbalance, or 'roc_auc'
-	    n_jobs=-1,                  # Use all available CPU cores for parallelism across parameter sets
-	    verbose=2                   # Verbosity level
+	    cv=3,
+	    scoring='f1',
+	    n_jobs=-1,
+	    verbose=2
 	)
 
 	grid.fit(X_train, y_train)
