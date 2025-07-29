@@ -11,8 +11,6 @@ A machine learning project designed to predict the likelihood of a patient havin
 
 ## 🚀 Live Demo
 
-**[Link to your deployed Streamlit App]** (<- Replace with your actual deployment URL)
-
 ![Streamlit App Screenshot](images/Screenshot.png)
 *A preview of the interactive stroke prediction web application.*
 
